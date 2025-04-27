@@ -62,7 +62,7 @@ public class ServicioImpl implements Servicio {
 			 * calcular sumando los dias de alquiler (ver variable DIAS_DE_ALQUILER) a la
 			 * fecha ini.
 			 */
-			// 1. Comprobar existencia del cliente
+            // 1. Comprobar existencia del cliente
             String sqlCliente = "SELECT 1 FROM Clientes WHERE NIF = ?";
             st = con.prepareStatement(sqlCliente);
             st.setString(1, nifCliente);
@@ -72,7 +72,7 @@ public class ServicioImpl implements Servicio {
             }
             rs.close();
             st.close();
-            
+
             // 2. Comprobar existencia del vehículo
             String sqlVehiculo = "SELECT 1 FROM Vehiculos WHERE matricula = ?";
             st = con.prepareStatement(sqlVehiculo);
@@ -84,19 +84,19 @@ public class ServicioImpl implements Servicio {
             rs.close();
             st.close();
 
-          
+		} catch (AlquilerCochesException ace) {
+            // Completar por el alumno
+            LOGGER.debug(ace.getMessage());
+            throw ace;
 
-			
-
-		} catch (SQLException e) {
+        } catch (SQLException e) {
 			// Completar por el alumno
-
 			LOGGER.debug(e.getMessage());
-
 			throw e;
 
 		} finally {
 			/* A rellenar por el alumnado*/
+          
 		}
 	}
 }
