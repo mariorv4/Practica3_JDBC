@@ -1,77 +1,102 @@
 package lsi.ubu.servicios;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.Date;
-import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import lsi.ubu.excepciones.AlquilerCochesException;
 import lsi.ubu.util.PoolDeConexiones;
+import lsi.ubu.Misc;
 
 public class ServicioImpl implements Servicio {
-	private static final Logger LOGGER = LoggerFactory.getLogger(ServicioImpl.class);
 
-	private static final int DIAS_DE_ALQUILER = 4;
+    private static final Logger LOGGER = LoggerFactory.getLogger(ServicioImpl.class);
+    private static final int DEFAULT_INVOICE_DAYS = 4;
 
-	public void alquilar(String nifCliente, String matricula, Date fechaIni, Date fechaFin) throws SQLException {
-		PoolDeConexiones pool = PoolDeConexiones.getInstance();
+    @Override
+    public void alquilar(String nifCliente, String matricula, Date fechaIni, Date fechaFin) throws SQLException {
+        PoolDeConexiones pool = PoolDeConexiones.getInstance();
+        Connection con = null;
+        PreparedStatement st = null;
+        ResultSet rs = null;
 
-		Connection con = null;
-		PreparedStatement st = null;
-		ResultSet rs = null;
+        try {
+            con = pool.getConnection();
+            con.setAutoCommit(false);
 
-		/*
-		 * El calculo de los dias se da hecho
-		 */
-		long diasDiff = DIAS_DE_ALQUILER;
-		if (fechaFin != null) {
-			diasDiff = TimeUnit.MILLISECONDS.toDays(fechaFin.getTime() - fechaIni.getTime());
+            // 1. Comprobar existencia del cliente
+            String sqlCliente = "SELECT 1 FROM Clientes WHERE NIF = ?";
+            st = con.prepareStatement(sqlCliente);
+            st.setString(1, nifCliente);
+            rs = st.executeQuery();
+            if (!rs.next()) {
+                throw new AlquilerCochesException(AlquilerCochesException.CLIENTE_NO_EXIST);
+            }
+            rs.close();
+            st.close();
 
-			if (diasDiff < 1) {
-				throw new AlquilerCochesException(AlquilerCochesException.SIN_DIAS);
-			}
-		}
+            // 2. Comprobar existencia del vehículo
+            String sqlVehiculo = "SELECT 1 FROM Vehiculos WHERE matricula = ?";
+            st = con.prepareStatement(sqlVehiculo);
+            st.setString(1, matricula);
+            rs = st.executeQuery();
+            if (!rs.next()) {
+                throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_NO_EXIST);
+            }
+            rs.close();
+            st.close();
 
-		try {
-			con = pool.getConnection();
+            // 3. Calcular fechaFin si es null
+            if (fechaFin == null) {
+                fechaFin = Misc.addDays(fechaIni, DEFAULT_INVOICE_DAYS);
+            }
 
-			/* A completar por el alumnado... */
+            // 4. Comprobar número de días
+            int dias = Misc.howManyDaysBetween(fechaFin, fechaIni);
+            if (dias < 1) {
+                throw new AlquilerCochesException(AlquilerCochesException.SIN_DIAS);
+            }
 
-			/* ================================= AYUDA R�PIDA ===========================*/
-			/*
-			 * Algunas de las columnas utilizan tipo numeric en SQL, lo que se traduce en
-			 * BigDecimal para Java.
-			 * 
-			 * Convertir un entero en BigDecimal: new BigDecimal(diasDiff)
-			 * 
-			 * Sumar 2 BigDecimals: usar metodo "add" de la clase BigDecimal
-			 * 
-			 * Multiplicar 2 BigDecimals: usar metodo "multiply" de la clase BigDecimal
-			 *
-			 * 
-			 * Paso de util.Date a sql.Date java.sql.Date sqlFechaIni = new
-			 * java.sql.Date(sqlFechaIni.getTime());
-			 *
-			 *
-			 * Recuerda que hay casos donde la fecha fin es nula, por lo que se debe de
-			 * calcular sumando los dias de alquiler (ver variable DIAS_DE_ALQUILER) a la
-			 * fecha ini.
-			 */
+            // 5. Comprobar disponibilidad del vehículo (solape de fechas)
+            // Un vehículo está ocupado si existe alguna reserva donde:
+            // (fecha_ini <= fechaFin) AND (fecha_fin >= fechaIni)
+            String sqlDisponibilidad = "SELECT 1 FROM Reservas WHERE matricula = ? AND fecha_ini <= ? AND fecha_fin >= ?";
+            st = con.prepareStatement(sqlDisponibilidad);
+            st.setString(1, matricula);
+            st.setDate(2, new java.sql.Date(fechaFin.getTime()));
+            st.setDate(3, new java.sql.Date(fechaIni.getTime()));
+            rs = st.executeQuery();
+            if (rs.next()) {
+                throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_OCUPADO);
+            }
+            rs.close();
+            st.close();
 
-		} catch (SQLException e) {
-			// Completar por el alumno
+            // 6. Insertar la reserva
+            // Asumimos que nroReserva es generado por la secuencia seq_reservas.NEXTVAL
+            String sqlInsert = "INSERT INTO Reservas (nroReserva, cliente, matricula, fecha_ini, fecha_fin) VALUES (seq_reservas.NEXTVAL, ?, ?, ?, ?)";
+            st = con.prepareStatement(sqlInsert);
+            st.setString(1, nifCliente);
+            st.setString(2, matricula);
+            st.setDate(3, new java.sql.Date(fechaIni.getTime()));
+            st.setDate(4, new java.sql.Date(fechaFin.getTime()));
+            st.executeUpdate();
 
-			LOGGER.debug(e.getMessage());
+            con.commit();
 
-			throw e;
-
-		} finally {
-			/* A rellenar por el alumnado*/
-		}
-	}
+        } catch (AlquilerCochesException ace) {
+            if (con != null) con.rollback();
+            throw ace;
+        } catch (Exception e) {
+            if (con != null) con.rollback();
+            LOGGER.error("Error inesperado en alquiler", e);
+            throw new SQLException(e);
+        } finally {
+            if (rs != null) try { rs.close(); } catch (Exception ignored) {}
+            if (st != null) try { st.close(); } catch (Exception ignored) {}
+            if (con != null) try { con.setAutoCommit(true); con.close(); } catch (Exception ignored) {}
+        }
+    }
 }

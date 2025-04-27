@@ -374,4 +374,8 @@ public class Tests {
 			}
 		}
 	}
+	public static void main(String[] args) throws SQLException {
+        Tests tests = new Tests();
+        tests.ejecutarTests();
+}
 }
