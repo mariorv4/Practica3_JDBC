@@ -159,8 +159,16 @@ public class ServicioImpl implements Servicio {
 			throw e;
 
 		} finally {
-			/* A rellenar por el alumnado*/
-          
+			// Cierre seguro de recursos para evitar fugas de memoria/conexiones
+			if (rs != null) {
+				try { rs.close(); } catch (Exception ex) { LOGGER.warn("Error cerrando ResultSet", ex); }
+			}
+			if (st != null) {
+				try { st.close(); } catch (Exception ex) { LOGGER.warn("Error cerrando PreparedStatement", ex); }
+			}
+			if (con != null) {
+				try { con.close(); } catch (Exception ex) { LOGGER.warn("Error cerrando Connection", ex); }
+			}
 		}
-	}
+}
 }
