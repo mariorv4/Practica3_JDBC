@@ -42,7 +42,7 @@ public class ServicioImpl implements Servicio {
 
 			/* A completar por el alumnado... */
 
-			/* ================================= AYUDA RÁPIDA ===========================*/
+			/* ================================= AYUDA Rï¿½PIDA ===========================*/
 			/*
 			 * Algunas de las columnas utilizan tipo numeric en SQL, lo que se traduce en
 			 * BigDecimal para Java.
@@ -62,6 +62,20 @@ public class ServicioImpl implements Servicio {
 			 * calcular sumando los dias de alquiler (ver variable DIAS_DE_ALQUILER) a la
 			 * fecha ini.
 			 */
+			// 1. Comprobar existencia del cliente
+            String sqlCliente = "SELECT 1 FROM Clientes WHERE NIF = ?";
+            st = con.prepareStatement(sqlCliente);
+            st.setString(1, nifCliente);
+            rs = st.executeQuery();
+            if (!rs.next()) {
+                throw new AlquilerCochesException(AlquilerCochesException.CLIENTE_NO_EXIST);
+            }
+            rs.close();
+            st.close();
+
+          
+
+			
 
 		} catch (SQLException e) {
 			// Completar por el alumno
