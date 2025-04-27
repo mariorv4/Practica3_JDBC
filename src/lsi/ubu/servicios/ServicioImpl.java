@@ -104,7 +104,27 @@ public class ServicioImpl implements Servicio {
             }
             rs.close();
             st.close();
-
+            
+            // 3. Comprobar si el Vehículo está disponible 
+            String sqlOverlapCheck = "SELECT 1 FROM Reservas " + 
+                                     "WHERE matricula = ? " +
+                                     "AND fecha_ini < ? " + 
+                                     "AND fecha_fin > ?";   
+            st = con.prepareStatement(sqlOverlapCheck); 
+            st.setString(1, matricula);
+            st.setDate(2, sqlFechaFin);  
+            st.setDate(3, sqlFechaIni);  
+            rs = st.executeQuery(); 
+            if (rs.next()) {
+                // Si hay resultado, hay solapamiento
+                rs.close(); 
+                st.close();
+                throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_OCUPADO);
+            }
+            LOGGER.debug("Vehículo {} disponible entre {} y {}.", matricula, sqlFechaIni, sqlFechaFin);
+            rs.close(); 
+            st.close(); 
+            
 		} catch (AlquilerCochesException ace) {
             // Completar por el alumno
             LOGGER.debug(ace.getMessage());
