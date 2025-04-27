@@ -72,6 +72,17 @@ public class ServicioImpl implements Servicio {
             }
             rs.close();
             st.close();
+            
+            // 2. Comprobar existencia del vehículo
+            String sqlVehiculo = "SELECT 1 FROM Vehiculos WHERE matricula = ?";
+            st = con.prepareStatement(sqlVehiculo);
+            st.setString(1, matricula);
+            rs = st.executeQuery();
+            if (!rs.next()) {
+                throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_NO_EXIST);
+            }
+            rs.close();
+            st.close();
 
           
 
