@@ -1,6 +1,7 @@
 package lsi.ubu.servicios;
 
 import java.sql.Connection;
+import lsi.ubu.Misc;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -29,14 +30,34 @@ public class ServicioImpl implements Servicio {
 		 * El calculo de los dias se da hecho
 		 */
 		long diasDiff = DIAS_DE_ALQUILER;
+		
+		Date fechaFinEfectiva = fechaFin; // Fecha final a usar
+		
+		if (fechaIni == null) { // Añadida validación básica
+            LOGGER.error("La fecha de inicio no puede ser nula.");
+            throw new SQLException("Fecha de inicio requerida.");
+       }
+		
+
 		if (fechaFin != null) {
 			diasDiff = TimeUnit.MILLISECONDS.toDays(fechaFin.getTime() - fechaIni.getTime());
 
 			if (diasDiff < 1) {
 				throw new AlquilerCochesException(AlquilerCochesException.SIN_DIAS);
 			}
+			
+			// fechaFinEfectiva ya es fechaFin
+		} else {
+            // Calcular fechaFinEfectiva si era null
+            fechaFinEfectiva = Misc.addDays(fechaIni, DIAS_DE_ALQUILER);
+            LOGGER.debug("Fecha fin no proporcionada, calculada a {} días: {}", diasDiff, fechaFinEfectiva);
 		}
-
+		
+		
+		// Convertir a java.sql.Date
+		java.sql.Date sqlFechaIni = new java.sql.Date(fechaIni.getTime());
+		java.sql.Date sqlFechaFin = new java.sql.Date(fechaFinEfectiva.getTime());
+        
 		try {
 			con = pool.getConnection();
 
