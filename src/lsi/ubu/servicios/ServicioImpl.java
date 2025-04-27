@@ -139,6 +139,7 @@ public class ServicioImpl implements Servicio {
 
             if (filasInsertadas != 1) {
                 // Si no se insertó exactamente 1 fila, algo fue mal
+            	st.close();
                 throw new SQLException("Error inesperado al insertar la reserva, filas afectadas: " + filasInsertadas);
             }
             LOGGER.info("Reserva insertada con éxito para cliente {} vehículo {} (commit pendiente).", nifCliente, matricula);
