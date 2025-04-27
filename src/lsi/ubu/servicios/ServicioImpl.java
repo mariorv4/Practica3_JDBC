@@ -125,6 +125,28 @@ public class ServicioImpl implements Servicio {
             rs.close(); 
             st.close(); 
             
+            
+         // 4. Insertar la nueva reserva
+            String sqlInsertReserva = "INSERT INTO Reservas (idReserva, cliente, matricula, fecha_ini, fecha_fin) " +
+                                      "VALUES (seq_reservas.NEXTVAL, ?, ?, ?, ?)";
+            st = con.prepareStatement(sqlInsertReserva); 
+            st.setString(1, nifCliente);
+            st.setString(2, matricula);
+            st.setDate(3, sqlFechaIni);
+            st.setDate(4, sqlFechaFin); 
+
+            int filasInsertadas = st.executeUpdate();
+
+            if (filasInsertadas != 1) {
+                // Si no se insertó exactamente 1 fila, algo fue mal
+                throw new SQLException("Error inesperado al insertar la reserva, filas afectadas: " + filasInsertadas);
+            }
+            LOGGER.info("Reserva insertada con éxito para cliente {} vehículo {} (commit pendiente).", nifCliente, matricula);
+            st.close(); 
+            
+            
+            
+            
 		} catch (AlquilerCochesException ace) {
             // Completar por el alumno
             LOGGER.debug(ace.getMessage());
