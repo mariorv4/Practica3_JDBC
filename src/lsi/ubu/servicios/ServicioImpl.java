@@ -165,8 +165,17 @@ public class ServicioImpl implements Servicio {
             throw ace;
 
         } catch (SQLException e) {
-			// Completar por el alumno
-			LOGGER.debug(e.getMessage());
+        	//Log más detallado del error SQL
+            LOGGER.error("Error sql general capturado (Código: {}): {}", e.getErrorCode(), e.getMessage(), e);
+             if (con != null) {
+                try {
+                    LOGGER.info("Realizando rollback debido a SQLException...");
+                    con.rollback();
+                } catch (SQLException exRollback) {
+                     //Error crítico si falla el rollback
+                    LOGGER.error("Error critico al intentar hacer rollback tras SQLException.", exRollback);
+                }
+            }
 			throw e;
 
 		} finally {
