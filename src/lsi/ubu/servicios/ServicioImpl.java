@@ -144,8 +144,10 @@ public class ServicioImpl implements Servicio {
             }
             LOGGER.info("Reserva insertada con éxito para cliente {} vehículo {} (commit pendiente).", nifCliente, matricula);
             st.close(); 
-            
-            
+            //Hacemos commit
+            con.commit();
+            //Cambiamos el log para reflejar que el commit se ha hecho
+            LOGGER.info("Reserva realizada y transacción confirmada para cliente {} vehículo {}.", nifCliente, matricula);
             
             
 		} catch (AlquilerCochesException ace) {
