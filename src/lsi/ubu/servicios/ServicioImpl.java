@@ -151,8 +151,17 @@ public class ServicioImpl implements Servicio {
             
             
 		} catch (AlquilerCochesException ace) {
-            // Completar por el alumno
-            LOGGER.debug(ace.getMessage());
+			//Catch de AlquilerCochesEXception
+			LOGGER.warn("Excepción AlquilerCochesException capturada: {}", ace.getMessage()); // Mejor log
+            if (con != null) {
+                try {
+                    LOGGER.info("Realizando rollback debido a AlquilerCochesException...");
+                    con.rollback();
+                } catch (SQLException exRollback) {
+                    // Error crítico si falla el rollback
+                    LOGGER.error("Error CRÍTICO al intentar rollback tras AlquilerCochesException.", exRollback);
+                }
+            }
             throw ace;
 
         } catch (SQLException e) {
