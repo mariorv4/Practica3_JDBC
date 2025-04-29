@@ -169,7 +169,20 @@ public class ServicioImpl implements Servicio {
             rs.close();
             st.close();
             
-            
+            //6.Obtener precio del combustible
+            String sqlFuelPrice = "SELECT precio_por_litro FROM precio_combustible WHERE tipo_combustible = ?";
+            st = con.prepareStatement(sqlFuelPrice);
+            st.setString(1, tipoCombustible);
+            rs = st.executeQuery();
+
+            if (!rs.next()) {
+                throw new SQLException("Error al obtener el precio del combustible");
+            }
+
+            BigDecimal precioPorLitro = rs.getBigDecimal("precio_por_litro");
+            rs.close();
+            st.close();
+
             
             
             
