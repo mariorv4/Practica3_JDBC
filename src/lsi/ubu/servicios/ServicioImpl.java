@@ -216,6 +216,26 @@ public class ServicioImpl implements Servicio {
             rs.close();
             st.close();
             
+            //12.Crear línea de factura para los días de alquiler
+            String conceptoDias = diasDiff + " dias de alquiler, vehiculo modelo " + idModelo;
+            String sqlLineaDias = "INSERT INTO lineas_factura (nroFactura, concepto, importe) VALUES (?, ?, ?)";
+            st = con.prepareStatement(sqlLineaDias);
+            st.setInt(1, nroFactura);
+            st.setString(2, conceptoDias);
+            st.setBigDecimal(3, costoAlquiler);
+            st.executeUpdate();
+            st.close();
+
+            //13.Crear línea de factura para el combustible
+            String conceptoCombustible = "Deposito lleno de " + capacidadDeposito + " litros de " + tipoCombustible;
+            String sqlLineaCombustible = "INSERT INTO lineas_factura (nroFactura, concepto, importe) VALUES (?, ?, ?)";
+            st = con.prepareStatement(sqlLineaCombustible);
+            st.setInt(1, nroFactura);
+            st.setString(2, conceptoCombustible);
+            st.setBigDecimal(3, costoLlenarDeposito);
+            st.executeUpdate();
+            st.close();
+            
             con.commit();
             //Cambiamos el log para reflejar que el commit se ha hecho
             LOGGER.info("Reserva realizada y transacción confirmada para cliente {} vehículo {}.", nifCliente, matricula);
