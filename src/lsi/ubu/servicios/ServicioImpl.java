@@ -194,6 +194,18 @@ public class ServicioImpl implements Servicio {
             //9.Calcular importe total de la factura
             BigDecimal importeTotal = costoAlquiler.add(costoLlenarDeposito);
             
+            //10.Crear factura
+            String sqlCreateInvoice = "INSERT INTO facturas (nroFactura, importe, cliente) " +
+                                  "VALUES (seq_num_fact.NEXTVAL, ?, ?)";
+            st = con.prepareStatement(sqlCreateInvoice);
+            st.setBigDecimal(1, importeTotal);
+            st.setString(2, nifCliente);
+            int facturaInserted = st.executeUpdate();
+            st.close();
+
+            if (facturaInserted != 1) {
+                throw new SQLException("Error al crear la factura");
+            }
             
             con.commit();
             //Cambiamos el log para reflejar que el commit se ha hecho
