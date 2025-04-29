@@ -207,6 +207,15 @@ public class ServicioImpl implements Servicio {
                 throw new SQLException("Error al crear la factura");
             }
             
+            //11.Obtener el número de factura recién creado
+            String sqlGetInvoiceNumber = "SELECT seq_num_fact.CURRVAL FROM dual";
+            st = con.prepareStatement(sqlGetInvoiceNumber);
+            rs = st.executeQuery();
+            rs.next();
+            int nroFactura = rs.getInt(1);
+            rs.close();
+            st.close();
+            
             con.commit();
             //Cambiamos el log para reflejar que el commit se ha hecho
             LOGGER.info("Reserva realizada y transacción confirmada para cliente {} vehículo {}.", nifCliente, matricula);
