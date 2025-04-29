@@ -1,5 +1,6 @@
 package lsi.ubu.servicios;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import lsi.ubu.Misc;
 import java.sql.PreparedStatement;
@@ -145,6 +146,33 @@ public class ServicioImpl implements Servicio {
             LOGGER.info("Reserva insertada con éxito para cliente {} vehículo {} (commit pendiente).", nifCliente, matricula);
             st.close(); 
             //Hacemos commit
+            
+            //Parte de los coches para completar las facturas
+            
+            //5.Obtener información del modelo del vehículo
+            String sqlModelInfo = "SELECT m.precio_cada_dia, m.tipo_combustible, m.capacidad_deposito, m.id_modelo " +
+                              "FROM vehiculos v JOIN modelos m ON v.id_modelo = m.id_modelo " +
+                              "WHERE v.matricula = ?";
+            st = con.prepareStatement(sqlModelInfo);
+            st.setString(1, matricula);
+            rs = st.executeQuery();
+
+            if (!rs.next()) {
+                throw new SQLException("Error al obtener información del modelo del vehículo");
+            }
+            //Variables que usaremos para los coches
+            // Extraer información del modelo
+            BigDecimal precioPorDia = rs.getBigDecimal("precio_cada_dia");
+            String tipoCombustible = rs.getString("tipo_combustible");
+            int capacidadDeposito = rs.getInt("capacidad_deposito");
+            int idModelo = rs.getInt("id_modelo");
+            rs.close();
+            st.close();
+            
+            
+            
+            
+            
             con.commit();
             //Cambiamos el log para reflejar que el commit se ha hecho
             LOGGER.info("Reserva realizada y transacción confirmada para cliente {} vehículo {}.", nifCliente, matricula);
