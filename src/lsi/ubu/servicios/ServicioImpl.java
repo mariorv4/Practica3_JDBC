@@ -183,7 +183,16 @@ public class ServicioImpl implements Servicio {
             rs.close();
             st.close();
 
-            
+            //7.Calcular coste del alquiler
+            BigDecimal diasBigDecimal = new BigDecimal(diasDiff);
+            BigDecimal costoAlquiler = precioPorDia.multiply(diasBigDecimal);
+
+            //8.Calcular coste del combustible
+            BigDecimal capacidadBigDecimal = new BigDecimal(capacidadDeposito);
+            BigDecimal costoLlenarDeposito = precioPorLitro.multiply(capacidadBigDecimal);
+
+            //9.Calcular importe total de la factura
+            BigDecimal importeTotal = costoAlquiler.add(costoLlenarDeposito);
             
             
             con.commit();
