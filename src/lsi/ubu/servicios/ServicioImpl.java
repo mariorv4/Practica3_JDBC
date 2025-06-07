@@ -217,9 +217,170 @@ public class ServicioImpl implements Servicio {
 	}
 
 
-	// Añade este método vacío para que la clase compile
 	@Override
-	public void anular_alquiler(String idReserva, String nifCliente, String matricula, Date fechaIni, Date fechaFin) throws SQLException {
-	    /* A completar por el alumnado en los siguientes commits */
-	}
+public void anular_alquiler(String idReservaStr, String nifCliente, String matricula, Date fechaIni, Date fechaFin) throws SQLException {
+    PoolDeConexiones pool = PoolDeConexiones.getInstance();
+    Connection con = null;
+    PreparedStatement st = null;
+    ResultSet rs = null;
+
+    long diasDiff;
+
+    if (fechaIni == null || fechaFin == null) {
+        LOGGER.error("Las fechas de inicio y fin son obligatorias para la anulación.");
+        throw new SQLException("Fechas de inicio y fin requeridas para la anulación.");
+    }
+
+    diasDiff = TimeUnit.MILLISECONDS.toDays(fechaFin.getTime() - fechaIni.getTime());
+    if (diasDiff < 1) {
+        throw new AlquilerCochesException(AlquilerCochesException.SIN_DIAS); 
+    }
+
+    java.sql.Date sqlFechaIniParam = new java.sql.Date(fechaIni.getTime());
+    java.sql.Date sqlFechaFinParam = new java.sql.Date(fechaFin.getTime());
+    int idReserva;
+
+    try {
+        idReserva = Integer.parseInt(idReservaStr);
+    } catch (NumberFormatException e) {
+        LOGGER.error("idReserva '{}' no es un número válido.", idReservaStr);
+        throw new AlquilerCochesException(AlquilerCochesException.RESERVA_NO_EXIST); 
+    }
+
+    try {
+        con = pool.getConnection();
+        con.setAutoCommit(false); 
+
+        // 1. Verificar existencia de la reserva y obtener sus datos
+        String dbNifCliente;
+        String dbMatricula;
+        java.sql.Date dbSqlFechaIni;
+        java.sql.Date dbSqlFechaFin; // Puede ser null si en la BD se guardó como null
+
+        String sqlCheckReserva = "SELECT cliente, matricula, fecha_ini, fecha_fin FROM Reservas WHERE idReserva = ?";
+        st = con.prepareStatement(sqlCheckReserva);
+        st.setInt(1, idReserva);
+        rs = st.executeQuery();
+
+        if (!rs.next()) {
+            if(rs!=null) rs.close(); 
+            if(st!=null) st.close();
+            throw new AlquilerCochesException(AlquilerCochesException.RESERVA_NO_EXIST); 
+        }
+        dbNifCliente = rs.getString("cliente");
+        dbMatricula = rs.getString("matricula");
+        dbSqlFechaIni = rs.getDate("fecha_ini");
+        dbSqlFechaFin = rs.getDate("fecha_fin");
+        rs.close(); 
+        st.close();
+
+        // 2. Validar que los datos proporcionados al método coinciden con los de la reserva almacenada
+        boolean fechasFinCoinciden;
+        if (dbSqlFechaFin == null) {
+             fechasFinCoinciden = (sqlFechaFinParam == null); // Esto daría false si Tests.java pasa siempre una fecha no nula
+        } else {
+             fechasFinCoinciden = dbSqlFechaFin.equals(sqlFechaFinParam);
+        }
+
+        if (!dbNifCliente.equals(nifCliente) ||
+            !dbMatricula.equals(matricula) ||
+            !dbSqlFechaIni.equals(sqlFechaIniParam) ||
+            !fechasFinCoinciden ) {
+            LOGGER.error("Los datos proporcionados para la anulación no coinciden con los de la reserva ID {}.", idReserva);
+            throw new SQLException("Los datos proporcionados (NIF, matrícula, fechas) no coinciden con los de la reserva a anular.");
+        }
+        
+        // 3. Comprobar si el NIF del cliente existe en la tabla Clientes
+        String sqlCheckCliente = "SELECT 1 FROM Clientes WHERE NIF = ?";
+        st = con.prepareStatement(sqlCheckCliente);
+        st.setString(1, nifCliente); 
+        rs = st.executeQuery();
+        if (!rs.next()) {
+            if(rs!=null) rs.close(); 
+            if(st!=null) st.close();
+            throw new AlquilerCochesException(AlquilerCochesException.CLIENTE_NO_EXIST); 
+        }
+        rs.close(); 
+        st.close();
+
+        // 4. Comprobar si la matrícula existe en la tabla Vehiculos
+        String sqlCheckVehiculo = "SELECT 1 FROM Vehiculos WHERE matricula = ?";
+        st = con.prepareStatement(sqlCheckVehiculo);
+        st.setString(1, matricula); 
+        rs = st.executeQuery();
+        if (!rs.next()) {
+            if(rs!=null) rs.close(); 
+            if(st!=null) st.close();
+            throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_NO_EXIST); 
+        }
+        rs.close(); 
+        st.close();
+        
+        // Determinar la fecha de fin efectiva de la reserva original para la comprobación de solapamiento
+        java.sql.Date fechaFinReservaOriginalEfectiva;
+        if (dbSqlFechaFin != null) {
+            fechaFinReservaOriginalEfectiva = dbSqlFechaFin;
+        } else {
+            Calendar cal = Calendar.getInstance();
+            cal.setTime(dbSqlFechaIni);
+            cal.add(Calendar.DAY_OF_YEAR, DIAS_DE_ALQUILER);
+            fechaFinReservaOriginalEfectiva = new java.sql.Date(cal.getTimeInMillis());
+        }
+
+        // 5. Comprobar "Si ese vehículo ya no está disponible" (Código 5)
+        String sqlVehiculoNoDisponibleCheck = "SELECT 1 FROM Reservas " +
+                                              "WHERE matricula = ? " +
+                                              "AND fecha_ini < ? " + 
+                                              "AND NVL(fecha_fin, fecha_ini + 1000) > ? " + 
+                                              "AND idReserva <> ?"; 
+        st = con.prepareStatement(sqlVehiculoNoDisponibleCheck);
+        st.setString(1, dbMatricula);    
+        st.setDate(2, fechaFinReservaOriginalEfectiva);
+        st.setDate(3, dbSqlFechaIni);    
+        st.setInt(4, idReserva);
+        rs = st.executeQuery();
+        if (rs.next()) { 
+            if(rs!=null) rs.close(); 
+            if(st!=null) st.close();
+            throw new AlquilerCochesException(AlquilerCochesException.VEHICULO_OCUPADO); 
+        }
+        rs.close(); 
+        st.close();
+
+        // -- El resto de la lógica (eliminación y commit) irá en los siguientes commits --
+
+        // Por ahora, para que compile y poder probar solo las validaciones, hacemos rollback y salimos.
+        LOGGER.info("Todas las validaciones de anular_alquiler pasaron. Finalizando sin realizar cambios.");
+        con.rollback(); // Hacemos rollback para no dejar la transacción abierta.
+		
+    } catch (AlquilerCochesException ace) {
+        LOGGER.warn("AlquilerCochesException en anulación (Reserva ID {}): {} (Código: {})", idReservaStr, ace.getMessage(), ace.getErrorCode());
+        if (con != null) {
+            try { 
+                con.rollback(); 
+            } catch (SQLException exRollback) { 
+                LOGGER.error("Error CRÍTICO al intentar rollback tras AlquilerCochesException en anular_alquiler.", exRollback); 
+            }
+        }
+        throw ace; 
+    } catch (SQLException e) {
+        LOGGER.error("SQLException en anulación (Reserva ID {}): {} (Código SQL: {})", idReservaStr, e.getMessage(), e.getErrorCode(), e);
+        if (con != null) {
+            try { 
+                con.rollback(); 
+            } catch (SQLException exRollback) { 
+                LOGGER.error("Error CRÍTICO al intentar rollback tras SQLException en anular_alquiler.", exRollback); 
+            }
+        }
+        throw e; 
+    } finally {
+        try { if (rs != null) rs.close(); } catch (SQLException e) { LOGGER.warn("Error cerrando ResultSet en anular_alquiler", e); }
+        try { if (st != null) st.close(); } catch (SQLException e) { LOGGER.warn("Error cerrando PreparedStatement en anular_alquiler", e); }
+        try { 
+            if (con != null) {
+                con.close(); 
+            }
+        } catch (SQLException e) { LOGGER.warn("Error cerrando Connection en anular_alquiler", e); }
+    }
+}
 	}
